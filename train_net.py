@@ -13,7 +13,7 @@ from dataset import DeezerDataset
 
 def train_node_classifier(model, data, optimizer, criterion, n_epochs=200):
 
-    for epoch in range(1, n_epochs + 1):
+    for epoch in range(n_epochs):
         model.train()
         optimizer.zero_grad()
         out = model(data)
@@ -21,7 +21,6 @@ def train_node_classifier(model, data, optimizer, criterion, n_epochs=200):
         loss.backward()
         optimizer.step()
 
-        pred = out.argmax(dim=1)
         acc = eval_node_classifier(model, data, data.val_mask)
 
         if epoch % 10 == 0:
