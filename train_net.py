@@ -41,7 +41,7 @@ def parse_arguments(input_args=None):
     
     parser = ArgumentParser()
     
-    parser.add_argument('--data-root', type=str, default=".", help="root folder for data")
+    parser.add_argument('--data-root', type=str, default="./data", help="root folder for data")
     parser.add_argument('--model', type=str, default='gcn', help='type of the model, available: gcn, tf')
     parser.add_argument('--hid-dim', type=int, default=64, help='hidden dimension of the model')
     parser.add_argument('--max-epoch', type=int, default=200, help='number of training epochs')
