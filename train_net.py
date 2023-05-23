@@ -42,6 +42,9 @@ def parse_arguments(input_args=None):
     parser = ArgumentParser()
     
     parser.add_argument('--data-root', type=str, default="./data", help="root folder for data")
+    parser.add_argument('--from-raw', type=bool, default=False, action='store_true', help='whether to process from raw features')
+    parser.add_argument('--method', type=str, default=None, help='the method to process raw features')
+    parser.add_argument('--save-data', type=bool, default=False, action='store_true', help='whether to save the processed data')
     parser.add_argument('--model', type=str, default='gcn', help='type of the model, available: gcn, tf')
     parser.add_argument('--hid-dim', type=int, default=64, help='hidden dimension of the model')
     parser.add_argument('--max-epoch', type=int, default=200, help='number of training epochs')
@@ -55,13 +58,15 @@ def parse_arguments(input_args=None):
 if __name__ == "__main__":
     
     args = parse_arguments()
+    print("Using these configurations")
+    print(args)
     
     ### DEVICE GPU OR CPU : will select GPU if available
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("\nDevice: ", device)
     
     # initialize dataset (only 1 graph in it) and retrieve the data graph
-    dataset = DeezerDataset(args.data_root)
+    dataset = DeezerDataset(args.data_root, from_raw=args.from_raw, method=args.method, save_data=args.save_data)
     data_graph = dataset[0].to(device)
 
     ### DEFINE THE MODEL

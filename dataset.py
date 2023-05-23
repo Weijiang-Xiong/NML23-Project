@@ -13,6 +13,8 @@ from torch_geometric.datasets import DeezerEurope
 from torch_geometric.transforms import RandomNodeSplit
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from karateclub.node_embedding import FeatherNode
+from sklearn.decomposition import TruncatedSVD
+from node2vec import Node2Vec
 
 class DeezerDataset(InMemoryDataset):
     
@@ -25,7 +27,7 @@ class DeezerDataset(InMemoryDataset):
     url = 'https://graphmining.ai/datasets/ptg/deezer_europe.npz'
 
     def __init__(self, root, transform=None, pre_transform=None, val_size=0.1, test_size=0.2,
-                 from_raw_feature=False, raw_process_method="feather"):
+                 from_raw=False, method="feather", save_data=True):
         """
         Args:
             root (str): root folder to store datasets
@@ -35,43 +37,48 @@ class DeezerDataset(InMemoryDataset):
             raw_process_method (str, optional): methods to use when processing raw features. Defaults to "feather", which is the same as the dataset paper. If set to None, the node features will be kept unprocessed, and the dataset will be returned in networkx format. 
         """
         # super class init will rely on this flag
-        self.from_raw_feature = from_raw_feature
-        self.raw_process_method = raw_process_method
+        self.from_raw = from_raw
+        self.method = method
+        self.save_data = save_data
         
         super().__init__(root, transform, pre_transform)
         
-        data, slices = torch.load(self.processed_paths[0])
-        
-        if isinstance(data, Data):
-            data = RandomNodeSplit(num_val=val_size, num_test=test_size)(data)
+        if self.save_data:
             
-        self.data, self.slices = data, slices
+            self.data, self.slices = torch.load(self.processed_paths[0])
+        else:
+            
+            self.data, self.slices = self._processed_data, self.processed_slices
+            
+        if isinstance(self._data, Data):
+            self.data = RandomNodeSplit(num_val=val_size, num_test=test_size)(self._data)
+
 
     @property
     def raw_file_names(self) -> str:
-        return 'deezer_europe.zip' if self.from_raw_feature else 'deezer_europe.npz'
+        return 'deezer_europe.zip' if self.from_raw else 'deezer_europe.npz'
 
     @property
     def processed_file_names(self) -> str:
-        if self.from_raw_feature and self.raw_process_method is None:
-            # this file stores a networkx graph, it's meant for visualizing and 
-            # analyse purposes only, not suitable for tensor operations
-            return 'data_nx_graph.pt'
+        
+        if not self.from_raw:
+            return 'data_preset.pt'
+        elif self.method is None:
+            return 'data_nx_graph.pt'   
         else:
-            return 'data.pt'
-
+            return 'data_{}.pt'.format(self.method)
     
-    @property
-    def processed_dir(self) -> str:
-        suffix = "_from_raw" if self.from_raw_feature else "_from_preset"
-        return super().processed_dir + suffix
+    # @property
+    # def processed_dir(self) -> str:
+    #     suffix = "_from_raw" if self.from_raw_feature else "_from_preset"
+    #     return super().processed_dir + suffix
     
     def download(self):
-        url = self.url_raw_features if self.from_raw_feature else self.url
+        url = self.url_raw_features if self.from_raw else self.url
         download_url(url, self.raw_dir)
 
     def process(self):
-        if self.from_raw_feature:
+        if self.from_raw:
             data = self.process_raw_feature()
         else:
             data = self.process_preset_feature()
@@ -83,7 +90,12 @@ class DeezerDataset(InMemoryDataset):
         if self.pre_transform is not None and isinstance(data, Data):
             data = self.pre_transform(data)
 
-        torch.save(self.collate([data]), self.processed_paths[0])
+        if self.save_data:
+            print("Saving the preprocessed data to {}".format(self.processed_paths[0]))
+            torch.save(self.collate([data]), self.processed_paths[0])
+        else:
+            print("Keeping the data in memory, linked to self._processed_data")
+            self._processed_data, self.processed_slices = self.collate([data])
 
     def process_preset_feature(self):
         data = np.load(self.raw_paths[0], 'r', allow_pickle=True)
@@ -99,6 +111,19 @@ class DeezerDataset(InMemoryDataset):
         
         return data 
 
+    @staticmethod
+    def reduce_data_dim(X, reduction_dimensions=128, svd_iterations=20, seed=42):
+        """ copied from FeatherNode._reduce_dimensions, and modified to a static method
+            X.shape (num_nodes, dim)
+        """
+        svd = TruncatedSVD(
+            n_components=reduction_dimensions,
+            n_iter=svd_iterations,
+            random_state=seed,
+        )
+        svd.fit(X)
+        X = svd.transform(X)
+        return X
         
     def process_raw_feature(self):
         
@@ -166,39 +191,89 @@ class DeezerDataset(InMemoryDataset):
             (np.array(user_idx), np.array(artist_idx))
             ), 
             shape=(num_users, num_artists))
+
         
         ####################################################
-        ############### data container  ####################
+        ############### data container 1 ###################
         ####################################################
         
-        if self.raw_process_method == 'feather':
-            # feather method requires a networkx graph as input 
-            graph = nx.Graph()
-            graph.add_nodes_from(node_ids)
-            graph.add_edges_from(edge_index.T.numpy()) # networkx requires shape (num_edge, 2)
-            # according to section 4.2 the feature dimension is reduced to 128
+        # construct the data graph in networkx format
+        graph = nx.Graph()
+        graph.add_nodes_from(node_ids)
+        graph.add_edges_from(edge_index.T.numpy()) # networkx requires shape (num_edge, 2)
+        
+        ####################################################
+        ############### node embeddings ####################
+        ####################################################
+        
+        node_embeddings = None
+        
+        if self.method == 'feather':
+            # according to section 4.2 the feature dimension is reduced to 128 by svd
             # other parameters are kept default
+            print("Embedding raw node features with feather method")
             embed_method = FeatherNode(reduction_dimensions=128)
             embed_method.fit(graph, feature_matrix_sparse)
             node_embeddings = embed_method.get_embedding()
             
-            data = Data(x=node_embeddings, y=labels, edge_index=edge_index)
+        elif self.method == 'feather+svd':
+            
+            print("Embedding raw node features with feather method, takes time ...")
+            embed_method = FeatherNode(reduction_dimensions=128)
+            embed_method.fit(graph, feature_matrix_sparse)
+            node_embeddings = embed_method.get_embedding()
+            
+            print("Reducing the data dimension with SVD, takes time ...")
+            node_embeddings = self.reduce_data_dim(node_embeddings, reduction_dimensions=128)
         
-        # return a networkx graph as the data container
+        elif self.method == 'node2vec+svd':
+            
+            # to keep the output embeddings in 128 dim, align with feather+svd
+            print("Embedding graph structure with Node2Vec")
+            embed_method = Node2Vec(graph, dimensions=64, workers=1)
+            model = embed_method.fit()
+            structural_embeddings = np.array([model.wv[n] for n in graph.nodes()])
+            
+            print("Reducing binary node feature with SVD")
+            attribute_embeddings = self.reduce_data_dim(feature_matrix_sparse.toarray(), reduction_dimensions=64)
+            node_embeddings = np.concatenate(structural_embeddings, attribute_embeddings, axis=1)
+            
+        elif self.method == 'binary':
+            
+            print("Using the binary features vectors as node embeddings")
+            node_embeddings = feature_matrix_sparse.toarray()
+            
+        elif self.method == 'svd':
+            
+            print("Using reduced binary feature vectors as node embeddings")
+            # using a sparse matrix is much faster than np array
+            node_embeddings = self.reduce_data_dim(feature_matrix_sparse, reduction_dimensions=128)
+            
+        # add the raw features directly to the graph, in this case we can't make it into Data class
+        # because the features have varying length, and can not be packed to a tensor.
         else:
-            graph = nx.Graph()
-            graph.add_nodes_from(node_ids)
-            graph.add_edges_from(edge_index.T)
-            node_feat_and_label = {nid:{"label":labels[nid], 'features':user_features[str(nid)]} for nid in node_ids}
+            node_feat_and_label = {nid:{"label":labels[nid], 'features':user_features[str(nid)]} 
+                                   for nid in node_ids}
             nx.set_node_attributes(G=graph, values=node_feat_and_label)
 
+        ####################################################
+        ############### data container 2 ###################
+        ####################################################
+        
+        if node_embeddings is None:
             data = graph
-            
-        return data
+        else:
+            data = Data(x=node_embeddings, y=labels, edge_index=edge_index)
+        
+        return data 
     
 
 if __name__ == "__main__":
     
-    dataset1 = DeezerDataset("./data/", from_raw_feature=False)
-    dataset2 = DeezerDataset("./data/", from_raw_feature=True, raw_process_method=None)
-    dataset3 = DeezerDataset("./data/", from_raw_feature=True, raw_process_method='feather')
+    DeezerDataset("./data/", from_raw=False)
+    DeezerDataset("./data/", from_raw=True, method=None)
+    DeezerDataset("./data/", from_raw=True, method='feather', save_data=False)
+    DeezerDataset("./data/", from_raw=True, method='feather+svd')
+    DeezerDataset("./data/", from_raw=True, method='node2vec+svd')
+    DeezerDataset("./data/", from_raw=True, method='binary', save_data=False)
+    DeezerDataset("./data/", from_raw=True, method='svd')
