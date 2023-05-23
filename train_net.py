@@ -54,7 +54,7 @@ def train_node_classifier(model, data, optimizer, criterion, n_epochs=200,
         # add text for the test accuracy line 
         ax[1].text(xs[int(0.1*len(xs))], test_acc, "{:.3f}".format(test_acc), fontsize=12, color="#ff7f0e")
         
-        ax[0].set_xlabel("Epochs")
+        ax[1].set_xlabel("Epochs")
         ax[1].set_title("Accuracy")
 
         ax[0].legend(loc="upper right", bbox_to_anchor=(1, 1))
