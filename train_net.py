@@ -96,7 +96,7 @@ def parse_arguments(input_args=None):
 
 if __name__ == "__main__":
     
-    args = parse_arguments("--save-data".split())
+    args = parse_arguments()
     print("Using these configurations")
     print(args)
     
