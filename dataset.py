@@ -27,7 +27,7 @@ class DeezerDataset(InMemoryDataset):
     url = 'https://graphmining.ai/datasets/ptg/deezer_europe.npz'
 
     def __init__(self, root, transform=None, pre_transform=None, val_size=0.1, test_size=0.2,
-                 from_raw=False, method="feather", save_data=True):
+                 from_raw=False, method="feather", save_data=False):
         """
         Args:
             root (str): root folder to store datasets
@@ -98,6 +98,7 @@ class DeezerDataset(InMemoryDataset):
             self._processed_data, self.processed_slices = self.collate([data])
 
     def process_preset_feature(self):
+        print("Using the provided dataset from PyTorch Geometric")
         data = np.load(self.raw_paths[0], 'r', allow_pickle=True)
         # data['features'].shape: (28281, 128)
         x = torch.from_numpy(data['features']).to(torch.float)
@@ -211,7 +212,7 @@ class DeezerDataset(InMemoryDataset):
         if self.method == 'feather':
             # according to section 4.2 the feature dimension is reduced to 128 by svd
             # other parameters are kept default
-            print("Embedding raw node features with feather method")
+            print("Embedding raw node features with feather method, takes time ...")
             embed_method = FeatherNode(reduction_dimensions=128)
             embed_method.fit(graph, feature_matrix_sparse)
             node_embeddings = embed_method.get_embedding()
@@ -229,14 +230,14 @@ class DeezerDataset(InMemoryDataset):
         elif self.method == 'node2vec+svd':
             
             # to keep the output embeddings in 128 dim, align with feather+svd
-            print("Embedding graph structure with Node2Vec")
+            print("Embedding graph structure with Node2Vec, takes time ...")
             embed_method = Node2Vec(graph, dimensions=64, workers=1)
             model = embed_method.fit()
             structural_embeddings = np.array([model.wv[n] for n in graph.nodes()])
             
-            print("Reducing binary node feature with SVD")
+            print("Reducing binary node feature with SVD, also takes time")
             attribute_embeddings = self.reduce_data_dim(feature_matrix_sparse.toarray(), reduction_dimensions=64)
-            node_embeddings = np.concatenate(structural_embeddings, attribute_embeddings, axis=1)
+            node_embeddings = np.concatenate([structural_embeddings, attribute_embeddings], axis=1)
             
         elif self.method == 'binary':
             
@@ -270,10 +271,10 @@ class DeezerDataset(InMemoryDataset):
 
 if __name__ == "__main__":
     
-    DeezerDataset("./data/", from_raw=False)
-    DeezerDataset("./data/", from_raw=True, method=None)
+    DeezerDataset("./data/", from_raw=False, save_data=True)
+    DeezerDataset("./data/", from_raw=True, method=None, save_data=True)
     DeezerDataset("./data/", from_raw=True, method='feather', save_data=False)
-    DeezerDataset("./data/", from_raw=True, method='feather+svd')
-    DeezerDataset("./data/", from_raw=True, method='node2vec+svd')
+    DeezerDataset("./data/", from_raw=True, method='feather+svd', save_data=True)
+    DeezerDataset("./data/", from_raw=True, method='node2vec+svd', save_data=True)
     DeezerDataset("./data/", from_raw=True, method='binary', save_data=False)
-    DeezerDataset("./data/", from_raw=True, method='svd')
+    DeezerDataset("./data/", from_raw=True, method='svd', save_data=True)
