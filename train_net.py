@@ -101,8 +101,10 @@ if __name__ == "__main__":
     print(args)
     
     if args.from_raw:
-        assert args.method is not None, "Raw features must have a processing method!"
-    
+        assert args.method is not None, "Raw features must have a processing method"
+        if args.save_data:
+            assert "svd" in args.method, "Can't save data without dimension reduction, the file will be too big"
+        
     ### DEVICE GPU OR CPU : will select GPU if available
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("\nDevice: ", device)
