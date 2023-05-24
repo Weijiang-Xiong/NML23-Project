@@ -1,7 +1,7 @@
+import os
 import json
 import zipfile
 from itertools import chain
-from typing import Callable, Optional
 
 import torch
 import numpy as np 
@@ -9,7 +9,6 @@ import pandas as pd
 import networkx as nx 
 
 from scipy.sparse import coo_matrix
-from torch_geometric.datasets import DeezerEurope
 from torch_geometric.transforms import RandomNodeSplit
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from karateclub.node_embedding import FeatherNode
@@ -43,13 +42,11 @@ class DeezerDataset(InMemoryDataset):
         
         super().__init__(root, transform, pre_transform)
         
-        if self.save_data:
-            
+        if os.path.exists(self.processed_paths[0]):
             self.data, self.slices = torch.load(self.processed_paths[0])
         else:
-            
             self.data, self.slices = self._processed_data, self.processed_slices
-            
+                
         if isinstance(self._data, Data):
             self.data = RandomNodeSplit(num_val=val_size, num_test=test_size)(self._data)
 
@@ -236,7 +233,7 @@ class DeezerDataset(InMemoryDataset):
             structural_embeddings = np.array([model.wv[n] for n in graph.nodes()])
             
             print("Reducing binary node feature with SVD, also takes time")
-            attribute_embeddings = self.reduce_data_dim(feature_matrix_sparse.toarray(), reduction_dimensions=64)
+            attribute_embeddings = self.reduce_data_dim(feature_matrix_sparse, reduction_dimensions=64)
             node_embeddings = np.concatenate([structural_embeddings, attribute_embeddings], axis=1)
             
         elif self.method == 'binary':
@@ -249,6 +246,16 @@ class DeezerDataset(InMemoryDataset):
             print("Using reduced binary feature vectors as node embeddings")
             # using a sparse matrix is much faster than np array
             node_embeddings = self.reduce_data_dim(feature_matrix_sparse, reduction_dimensions=128)
+        
+        elif self.method == "binary+n2v":
+            
+            print("Embedding graph structure with Node2Vec, takes time ...")
+            embed_method = Node2Vec(graph, dimensions=128, workers=1)
+            model = embed_method.fit()
+            structural_embeddings = np.array([model.wv[n] for n in graph.nodes()])
+            
+            attribute_embeddings = feature_matrix_sparse.toarray()
+            node_embeddings = np.concatenate([structural_embeddings, attribute_embeddings], axis=1)
             
         # add the raw features directly to the graph, in this case we can't make it into Data class
         # because the features have varying length, and can not be packed to a tensor.
@@ -264,7 +271,9 @@ class DeezerDataset(InMemoryDataset):
         if node_embeddings is None:
             data = graph
         else:
-            data = Data(x=node_embeddings, y=labels, edge_index=edge_index)
+            data = Data(x=torch.from_numpy(node_embeddings).to(torch.float32), 
+                        y=labels, 
+                        edge_index=edge_index)
         
         return data 
     
