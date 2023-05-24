@@ -128,5 +128,9 @@ if __name__ == "__main__":
                                  weight_decay=args.weight_decay)
     
     criterion = nn.CrossEntropyLoss()
+    save_note = "{}_{}".format(
+        args.method if args.from_raw else "preset",
+        args.model
+    )
     model = train_node_classifier(model, data_graph, optimizer, criterion, n_epochs=args.max_epoch,
-                                  plot=True, save_note=args.method)
+                                  plot=True, save_note=save_note)
