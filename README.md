@@ -33,6 +33,18 @@ The following command will train a GCN model with hidden dimension 64 for 200 ep
 python train_net.py --model gcn --hid-dim 64 --max-epoch 200 --learning-rate 0.0001 --weight-decay 0.001
 ```
 
+Training commands used in the project, please replace `gcn` with `tf` to run the model based on transformer-conv.
+
+```bash
+python train_net.py --model gcn
+python train_net.py --model gcn --from-raw --method binary
+python train_net.py --model gcn --from-raw --method svd
+python train_net.py --model gcn --from-raw --method binary+n2v
+python train_net.py --model gcn --from-raw --method feather
+python train_net.py --model gcn --from-raw --method feather+svd
+python train_net.py --model gcn --from-raw --method node2vec+svd
+```
+
 ## References
 
 A blog post about using pyg https://towardsdatascience.com/graph-neural-networks-with-pyg-on-node-classification-link-prediction-and-anomaly-detection-14aa38fe1275
