@@ -25,7 +25,16 @@ class GCN(nn.Module):
         return F.log_softmax(x, dim=1)
     
 class GraphTransformer(nn.Module):
-    """ Another baseline model that replaces the GCN conv with transformer conv
+    
+    """ 
+        Another baseline model that replaces the GCN conv with transformer conv. TransformerConv assigns attention scores to the neighborhood features, which is roughly
+        
+        feature_i = W1 @ feature_i + sum([attention(i,j) * W2 @ feature_j for j in all_nodes if is_neighbor(i, j)])
+                                          
+        where attention(i,j) = softmax(np.dot(W3 @ feature_i, W4 @ feature_j) / sqrt(hidden_size))
+        
+        See the complete equations here: 
+        https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.TransformerConv.html
     """
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()

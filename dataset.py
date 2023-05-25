@@ -17,8 +17,16 @@ from node2vec import Node2Vec
 
 class DeezerDataset(InMemoryDataset):
     
-    """ modified from torch_geometric.datasets.DeezerEurope 
-        paper: https://arxiv.org/abs/2005.07959
+    """ 
+        This class implements various preprocessing methods for Deezer Europe dataset (paper: https://arxiv.org/abs/2005.07959). 
+    
+        This dataset contains a single graph whose nodes are deezer users from european countries. The edges are mutual following relationship between users, and the node features are the artists (~30k in total) liked by the users.
+        The nodes are also labeled with the gender of the user. 
+        
+        num_nodes: 28281, num_edges: 185504 (a mutual following relation makes two 1's in a symmetric adjacency matrix)
+        
+        This implementation is modified from torch_geometric.datasets.DeezerEurope, and the key differences are the feature processing methods implemented in `self.process_raw_feature`, i.e., how to embed the liked artists of each user. Whereas the nodes, edges and labels are kept as they are. 
+        
     """
     # this URL provides the original data where the node features are the artists liked by a user
     url_raw_features = 'https://snap.stanford.edu/data/deezer_europe.zip'
@@ -29,11 +37,40 @@ class DeezerDataset(InMemoryDataset):
                  from_raw=False, method="feather", save_data=False):
         """
         Args:
-            root (str): root folder to store datasets
-            val_size (float, optional): size of validation set. Defaults to 0.1.
-            test_size (float, optional): size of test set. Defaults to 0.2.
-            from_raw_feature (bool, optional): whether to use the original features (artists liked by the users). Defaults to True. if set to false, will use the preprocessed node feature from torch geometric. 
-            raw_process_method (str, optional): methods to use when processing raw features. Defaults to "feather", which is the same as the dataset paper. If set to None, the node features will be kept unprocessed, and the dataset will be returned in networkx format. 
+            `root` (str): root folder to store datasets
+            
+            `val_size` (float, optional): size of validation set. Defaults to 0.1.
+            
+            `test_size` (float, optional): size of test set. Defaults to 0.2.
+            
+            `from_raw_feature` (bool, optional): whether to use the original features (artists liked by the users). Defaults to True. if set to false, will use the 128-D preprocessed node feature from torch geometric (yet the processing method is not found in its document), and `method` will not be effective. 
+            
+            `raw_process_method` (str, optional): methods to use when processing raw features (`from_raw` should be `True`). Defaults to `"feather"`, which is the same as the dataset paper. 
+            
+            `save_data`: whether to save the pre-processed data for future use. Recommended when the data dimension is properly reduced (i.e. with SVD), otherwise the feature file will be too big to save. 
+        
+        
+        All possible choices for `method`, when `from_raw` is set to `True`: 
+        
+            `None`: the node features will be kept unprocessed, and the data graph will be returned in networkx format. 
+            
+            `"feather"`: the attribute embedding methods, feature dimension ~30k
+            
+            `"feather+svd"`: use SVD to reduce the dimension of feather features to 128, aligned with the preset features.
+            
+            `"binary"`: use a 0/1 vector of length num_artists to represent the liked artists of each user, a 1 in the vector means the user likes the corresponding artist. 
+            
+            `"svd"`: use SVD to reduce the dimension of the `binary` features down to 128, keeping aligned with the preset features.
+            
+            `"node2vec+svd"`: use node2vec to encode the structure of the graph, and use svd of the `binary` features to represent feature information, both have 64-D and are concatenated to 128-D features. 
+            
+            `"binary+n2v"`: concatenate 128-D node2vec features to the `binary` features. 
+            
+            
+        After initializing the dataset, use dataset[0] to retrieve the data graph in torch_geometric.data.Data format, since this dataset contains only one graph. 
+        
+        All configurations are listed under `if __name__=='__main__`. 
+        
         """
         # super class init will rely on this flag
         self.from_raw = from_raw
@@ -111,8 +148,12 @@ class DeezerDataset(InMemoryDataset):
 
     @staticmethod
     def reduce_data_dim(X, reduction_dimensions=128, svd_iterations=20, seed=42):
-        """ copied from FeatherNode._reduce_dimensions, and modified to a static method
-            X.shape (num_nodes, dim)
+        """ 
+            Use SVD to reduce data dimension. This part is copied from FeatherNode._reduce_dimensions, and modified to a static method
+            
+            Input: X of shape (num_nodes, dim)
+            Output: X of shape (num_nodes, reduction_dimensions)
+            
         """
         svd = TruncatedSVD(
             n_components=reduction_dimensions,
@@ -281,9 +322,10 @@ class DeezerDataset(InMemoryDataset):
 if __name__ == "__main__":
     
     DeezerDataset("./data/", from_raw=False, save_data=True)
-    DeezerDataset("./data/", from_raw=True, method=None, save_data=True)
+    DeezerDataset("./data/", from_raw=True, method=None, save_data=True) # returns nx graph, not for network training
     DeezerDataset("./data/", from_raw=True, method='feather', save_data=False)
     DeezerDataset("./data/", from_raw=True, method='feather+svd', save_data=True)
     DeezerDataset("./data/", from_raw=True, method='node2vec+svd', save_data=True)
     DeezerDataset("./data/", from_raw=True, method='binary', save_data=False)
     DeezerDataset("./data/", from_raw=True, method='svd', save_data=True)
+    DeezerDataset("./data/", from_raw=True, method='binary+n2v', save_data=False)
