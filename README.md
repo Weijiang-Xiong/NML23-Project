@@ -33,16 +33,10 @@ The following command will train a GCN model with hidden dimension 64 for 200 ep
 python train_net.py --model gcn --hid-dim 64 --max-epoch 200 --learning-rate 0.0001 --weight-decay 0.001
 ```
 
-Training commands used in the project, please replace `gcn` with `tf` to run the model based on transformer-conv.
+All the commands used in this project are listed in `run_everything.py` and one can simply run it. However, please remember the experiments with `binary` or `feather` features may take up to 8 GB of GPU memory because the embedding matrix is very big.
 
 ```bash
-python train_net.py --model gcn
-python train_net.py --model gcn --from-raw --method binary
-python train_net.py --model gcn --from-raw --method svd
-python train_net.py --model gcn --from-raw --method binary+n2v
-python train_net.py --model gcn --from-raw --method feather
-python train_net.py --model gcn --from-raw --method feather+svd
-python train_net.py --model gcn --from-raw --method node2vec+svd
+python run_everything.py
 ```
 
 ## References
