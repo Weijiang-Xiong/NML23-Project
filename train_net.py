@@ -99,7 +99,7 @@ def parse_arguments(input_args=None):
     
     parser.add_argument('--data-root', type=str, default="./data", help="root folder for data")
     parser.add_argument('--from-raw', default=False, action='store_true', help='whether to process from raw features')
-    parser.add_argument('--method', type=str, default=None, choices=["feather", "feather+svd", "node2vec+svd", "binary", "svd", "binary+n2v"],help='the method to process raw features')
+    parser.add_argument('--method', type=str, default=None, choices=["feather", "feather+svd", "node2vec+svd", "binary", "svd", "binary+n2v", "n2v"],help='the method to process raw features')
     parser.add_argument('--save-data', default=False, action='store_true', help='whether to save the processed data')
     parser.add_argument('--model', type=str, default='gcn', choices=['gcn', 'tf'], help='type of the model')
     parser.add_argument('--hid-dim', type=int, default=64, help='hidden dimension of the model')

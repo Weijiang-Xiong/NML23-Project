@@ -298,6 +298,13 @@ class DeezerDataset(InMemoryDataset):
             attribute_embeddings = feature_matrix_sparse.toarray()
             node_embeddings = np.concatenate([structural_embeddings, attribute_embeddings], axis=1)
             
+        elif self.method == "n2v":
+            # this is a baseline case, only node2vec embeddings are used
+            print("Embedding graph structure with Node2Vec, takes time ...")
+            embed_method = Node2Vec(graph, dimensions=128, workers=1)
+            model = embed_method.fit()
+            node_embeddings = np.array([model.wv[n] for n in graph.nodes()])
+        
         # add the raw features directly to the graph, in this case we can't make it into Data class
         # because the features have varying length, and can not be packed to a tensor.
         else:
