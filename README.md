@@ -7,6 +7,8 @@ In this project we investigate the user graph of Deezer Europe dataset. The node
 The paper of the dataset propose the [FEATHER](https://arxiv.org/abs/2005.07959) method to learn node embedding from attributed graph.
 Following the authors' codes, we use [Karate Club](https://github.com/benedekrozemberczki/karateclub) to process raw node features.
 
+Final project report is NML_23_Project_Report.pdf.
+
 ## Installation
 
 This project is built upon `pytorch` and `pytorch_geometric`, we assume the existence of a conda environment called pytorch
